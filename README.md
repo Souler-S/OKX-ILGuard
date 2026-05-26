@@ -1,7 +1,13 @@
 # OKX-ILGuard — Impermanent Loss Protection Hook for Uniswap V4
 
-> **One-liner**: OKX-ILGuard provides LP impermanent loss protection for Uniswap V4 pools on X Layer.
+[English](#english) | [中文](#中文)
+
+> **One-liner / 一句话**: OKX-ILGuard provides LP impermanent loss protection for Uniswap V4 pools on X Layer.
 > Built for the [OKX X Layer Build X Hackathon — Hook Edition](https://web3.okx.com/zh-hans/xlayer/build-x-hackathon/hook).
+
+---
+
+## English
 
 ## What It Does
 
@@ -154,6 +160,74 @@ Integration tests (9):
   - Full close loop: add → swap → remove (real PM, no compensation: MVP formula limitation)
   - Direct remove with IL compensation (hookData=realLp, synthetic delta)
 ```
+
+---
+
+## 中文
+
+OKX-ILGuard 是一个 Uniswap V4 Hook，为 X Layer 上的流动性提供者自动补偿无常损失。当 LP 提取流动性且相比存入时发生价值损失，Hook 从预充值的保险储备金中直接向 LP 转账补偿。
+
+### MVP 范围
+
+- **仅支持全范围流动性** — 非全范围头寸会被拒绝。
+- **18 位小数 Mock 代币对** — 固定 `MockERC20` 代币，1:1 初始价格。
+- **预充值保险储备金** — 通过 `fundReserve()` 充值，暂未从真实 swap 费中扣除。
+- **理论保费会计** — `afterSwap` 发出 `InsurancePremiumAccrued` 事件，记录应收取的保费。真实 `afterSwapReturnDelta` 扣费已推迟。
+- **token0 补偿** — 从储备金通过直接 ERC20 转账支付补偿。
+- **简化 IL 计算** — 假设 1:1 初始价格（`depositValue = amount0 + amount1`）。生产版本将使用 sqrtPriceX96 计算。
+
+### Hook 生命周期
+
+| Hook | 作用 |
+|---|---|
+| `afterAddLiquidity` | 记录 LP 头寸快照（入场时的代币数量）。拒绝非全范围。 |
+| `afterSwap` | 跟踪理论保费。发出 `InsurancePremiumAccrued` 事件。 |
+| `beforeRemoveLiquidity` | 验证全范围头寸。 |
+| `afterRemoveLiquidity` | 检测无常损失。如果 IL 超过 5% 阈值，从储备金中补偿 LP。 |
+
+### 快速开始
+
+```bash
+forge install
+forge test -vvv
+forge test --match-contract ILGuardHookIntegrationTest -vvv
+```
+
+### 主网部署（X Layer chain 196）
+
+核心合约和关键交易见上方 English 章节表格。
+
+### MVP 诚实声明
+
+**X Layer 主网已验证：**
+- Hook 已部署并绑定到 V4 池
+- 全范围添加流动性生命周期（真实 PoolManager）
+- Swap 生命周期（真实 PoolSwapTest），触发 `afterSwap` / `InsurancePremiumAccrued`
+- 移除流动性生命周期，完成 add→swap→remove 完整闭环
+- 保险储备金已在链上充值 10 ether
+
+**Forge 测试验证：**
+- `ImpermanentLossDetected` — IL 计算逻辑
+- `ILCompensated` — LP 从储备金收到 token0 补偿
+
+**MVP 限制：**
+当前简化 IL 公式（`depositValue = amount0 + amount1`）假设 1:1 价格比。真实 swap 改变池价格后，该加法公式无法捕捉价格加权的价值变化。IL 补偿路径已完整实现并通过受控 synthetic delta 测试（`test_integration_directRemove_WithHookData_CompensatesRealLp`）。升级到 sqrtPriceX96 价格加权计算是 MVP 后最优先事项。
+
+### 测试覆盖
+
+```
+15 个测试：全部通过
+```
+
+### 未来升级路线
+
+1. **sqrtPriceX96 IL 计算** — 价格加权，适用于任意价格比
+2. **真实 afterSwapReturnDelta 扣费** — swap 费自动流入储备金
+3. **多币种补偿** — 支持任一代币支付补偿
+4. **集中流动性支持** — 扩展到非全范围
+5. **精算储备金模型** — 多池风险共担
+
+---
 
 ## License
 
