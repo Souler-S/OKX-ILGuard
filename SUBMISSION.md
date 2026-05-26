@@ -93,7 +93,7 @@ The current simplified IL formula (`depositValue = amount0 + amount1`) assumes a
 ## How to Run Tests
 
 ```bash
-git clone GITHUB_REPO_URL
+git clone https://github.com/Souler-S/OKX-ILGuard.git
 cd okx-ilguard
 forge install
 forge test -vvv
@@ -108,6 +108,8 @@ forge test --match-test test_integration_directRemove_WithHookData_CompensatesRe
 ## Demo Script
 
 See `DEMO_SCRIPT.md` for the 2-minute video script.
+
+Demo video: `VIDEO_URL_TO_BE_ADDED`
 
 ## Future Upgrade Path
 

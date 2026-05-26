@@ -32,7 +32,7 @@
 
 ## Submission Materials
 
-- [ ] GitHub repository public
+- [x] GitHub repository public: `https://github.com/Souler-S/OKX-ILGuard`
 - [ ] All mainnet addresses in README and SUBMISSION.md
 - [ ] All tx hashes in README and SUBMISSION.md
 - [ ] Demo video recorded (use `DEMO_SCRIPT.md`)

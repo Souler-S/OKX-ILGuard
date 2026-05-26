@@ -1,7 +1,7 @@
 # OKX-ILGuard — Tweet Drafts
 
 **IMPORTANT: Do NOT post these until CEO approves final GitHub repo and demo video links.**
-**Replace `[GitHub link]` and `[Demo video link]` before posting. Do not post until both links are live.**
+**GitHub link is filled. Replace `[Demo video link]` before posting. Do not post until the video link is live.**
 
 ---
 
@@ -24,7 +24,7 @@ Tests: IL detection + compensation branch.
 
 @Uniswap @flapdotsh
 
-[GitHub link]
+https://github.com/Souler-S/OKX-ILGuard
 [Demo video link]
 ```
 
