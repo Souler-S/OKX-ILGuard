@@ -1,165 +1,213 @@
 # OKX-ILGuard — Impermanent Loss Protection Hook for Uniswap V4
 
-
 [![CI](https://github.com/Souler-S/OKX-ILGuard/actions/workflows/test.yml/badge.svg)](https://github.com/Souler-S/OKX-ILGuard/actions/workflows/test.yml)
+
 [English](#english) | [中文](#中文)
 
-> **One-liner / 一句话**: Automatic impermanent loss compensation for Uniswap V4 full-range LPs.
+> **One-liner / 一句话**: Automatic impermanent loss compensation for Uniswap V4 full-range LPs on X Layer.
 > Built for the [OKX X Layer Build X Hackathon — Hook Edition](https://web3.okx.com/zh-hans/xlayer/build-x-hackathon/hook).
 
 ---
 
 ## English
 
+### ⚡ 60-Second Judge Path
+
+1. **Check the on-chain hook**: [ILGuardHook on X Layer Explorer](https://www.okx.com/explorer/xlayer/address/0x043b00Ae5d234e6c34107D60bFb663e7088a8744) — deployed, verified, bound to a live V4 pool.
+2. **Verify the lifecycle**: 8 on-chain transactions prove add→swap→remove loop (see [X Layer Mainnet Proofs](#x-layer-mainnet-proofs)).
+3. **Run the tests**: `forge test -vvv` — 18/18 pass. 9 integration tests exercise the real PoolManager.
+4. **See the demo**: [2-minute walkthrough on X](https://x.com/ThreeOclock_CN/status/2059224654519091393).
+
 ### What It Does
 
 OKX-ILGuard is a Uniswap V4 hook that:
 
-- **Records** LP positions at entry with sqrtPriceX96 for price-weighted valuation.
+- **Records** LP positions at entry with `sqrtPriceX96` for price-weighted valuation.
 - **Tracks** insurance premiums from every swap (15 BPS of output amount).
 - **Compensates** LPs from a pre-funded reserve when impermanent loss exceeds 5% at withdrawal.
 
+### Quick Start
+
+```bash
+# 1. Clone & install dependencies
+git clone https://github.com/Souler-S/OKX-ILGuard.git
+cd OKX-ILGuard
+forge install
+
+# 2. Build
+forge build --sizes
+
+# 3. Run all tests (18 total: 9 unit + 9 integration)
+forge test -vvv
+
+# 4. Run integration tests only (real PoolManager lifecycle)
+forge test --match-contract ILGuardHookIntegrationTest -vvv
+
+# 5. Check formatting
+forge fmt --check
+
+# 6. Verify contract size (must be < 24KB for deployment)
+forge build --sizes | grep ILGuard
+# Expected: | ILGuardHook | ~6,000 | ... | < 24,000 |
+```
+
+### X Layer Mainnet Proofs
+
+All 8 transactions executed on X Layer mainnet (chain 196). Every link opens the OKX Explorer.
+
+| # | Action | Tx Hash / Explorer Link | What It Proves |
+|---|---|---|---|
+| 1 | Deploy Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook bytecode on-chain, permission bits 0x0740 |
+| 2 | Deploy Token0 | [`0x6639...5411`](https://www.okx.com/explorer/xlayer/tx/0x663967aca4a6f199f8050ee0f590001f8688edf34be1fc7d14f2af1615a05411) | MockERC20 token0 deployed |
+| 3 | Deploy Token1 | [`0xafea...c781`](https://www.okx.com/explorer/xlayer/tx/0xafea393e249949a88b3c23d79bd5122edc53038cce56f69c43d30bd89260c781) | MockERC20 token1 deployed |
+| 4 | Initialize Pool | [`0xbbc6...2c33`](https://www.okx.com/explorer/xlayer/tx/0xbbc6f3fdaf6403951efe25aa2096cc4d9f32037adecfe3264891ff751f1b2c33) | V4 pool created, bound to ILGuardHook |
+| 5 | Fund Reserve | [`0xb9f9...d30c`](https://www.okx.com/explorer/xlayer/tx/0xb9f9362a51dd9f0d61bf9b3b599534f665abfc912ca47f3cd007f96e313dd30c) | 10 ether transferred to insurance reserve |
+| 6 | Add Liquidity | [`0x2977...8739`](https://www.okx.com/explorer/xlayer/tx/0x2977b45ab69829f59c72af013f237b3c86f11700e4d052496f5bb90dfebc8739) | `PositionSnapshotRecorded` event emitted |
+| 7 | Swap | [`0x77cd...70db`](https://www.okx.com/explorer/xlayer/tx/0x77cd00e027065a7f9c664330c80cca77054b4c72e2f8a99d9774d26d5f2c70db) | `InsurancePremiumAccrued` event emitted |
+| 8 | Remove Liquidity | [`0x4cfe...bedd`](https://www.okx.com/explorer/xlayer/tx/0x4cfe82e524041a6df0011abdaf3a51b75fe7cbe622acbc6d1111420fbe37bedd) | Full close: snapshot cleared, lifecycle complete |
+
+### On-Chain State (Post-DemoFlow)
+
+Verified on X Layer mainnet — you can check these yourself:
+
+```
+Hook:       0x043b00Ae5d234e6c34107D60bFb663e7088a8744
+Token0:     0x046EAE536455FE1EE1b78e9c0e3e13d55eDBe921
+Token1:     0xFe9049a12EF8e658F56D33734C0B0aEEe80824aF
+PoolId:     0x6f91ddd9bcd951400001e39c4d33eef23fb90c80d62a9bb3c967367e95432186
+PoolManager: 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32 (official Uniswap V4)
+
+positions(poolId, deployer):  (0, 0, 0, false)  ← snapshot cleared after remove
+reserves(poolId).balance:     10 ether          ← ready for next LP
+reserves(poolId).premiums:    > 0               ← swap fee tracked
+```
+
 ### Features
 
-| Feature | Description |
+| Feature | Implementation |
 |---|---|
-| sqrtPriceX96 IL calc | Price-weighted deposit/withdraw value, not additive approximation |
-| Premium tracking | `afterSwap` accrues `totalPremiumsAccrued` per swap |
-| Full-range enforcement | Non-full-range positions rejected at add/remove |
-| IL threshold | Compensation only when loss > 5% (configurable `compensationThresholdBps`) |
-| Token0 compensation | Paid from insurance reserve via direct ERC20 transfer |
+| sqrtPriceX96 IL calc | Price-weighted deposit/withdraw value via `_computePositionValue` |
+| Premium tracking | `afterSwap` accrues `totalPremiumsAccrued` (15 BPS × output) |
+| Full-range enforcement | Tick bounds validated at add and remove |
+| IL threshold | Compensation when loss > 5% (`compensationThresholdBps = 500`) |
+| Token0 compensation | Direct ERC20 transfer from pre-funded insurance reserve |
 
 ### Hook Lifecycle
 
 | Hook | Behavior |
 |---|---|
-| `afterAddLiquidity` | Records `PositionSnapshot` (amount0, amount1, sqrtPriceX96). Rejects non-full-range. |
-| `afterSwap` | Computes premium (15 BPS × output amount), emits `InsurancePremiumAccrued`. |
+| `afterAddLiquidity` | Records `PositionSnapshot(amount0, amount1, sqrtPriceX96)`. Rejects non-full-range. |
+| `afterSwap` | Computes premium = outputAmount × 15/10000. Emits `InsurancePremiumAccrued`. |
 | `beforeRemoveLiquidity` | Validates full-range tick bounds. |
-| `afterRemoveLiquidity` | Compares price-weighted deposit vs withdraw value. Compensates from reserve if IL > threshold. |
+| `afterRemoveLiquidity` | Compares `_computePositionValue(deposit)` vs `_computePositionValue(withdraw)`. Compensates if IL > 5%. |
 
-### Quick Start
+### Contract Architecture
 
-```bash
-forge install
-forge test -vvv                        # 18 tests (9 unit + 9 integration)
-forge test --match-contract ILGuardHookIntegrationTest -vvv
+```
+ILGuardHook (6,072 bytes runtime)
+├── afterAddLiquidity    → record PositionSnapshot with sqrtPriceX96
+├── afterSwap            → track premiums, emit InsurancePremiumAccrued
+├── beforeRemoveLiquidity → validate full-range
+├── afterRemoveLiquidity  → sqrtPriceX96 IL detection + compensate from reserve
+└── fundReserve          → external: anyone can fund the insurance pool
+```
+
+### Test Coverage
+
+```
+18 tests: 18 PASSED — CI verified
+
+Unit (9):                     Integration (9):
+  Snapshot with price ✓         Pool initialized with hook (real PM) ✓
+  Non-full-range revert ✓       Hook permissions validated ✓
+  Not-pool-manager revert ✓     Full-range add (router LP) ✓
+  Remove without snapshot ✓     Full-range add (hookData=realLp) ✓
+  IL detection + compensation ✓ Non-full-range revert (real PM) ✓
+  Reserve funding ✓             Real swap → InsurancePremiumAccrued ✓
+  afterSwap hookDelta ✓         Real PM remove (no IL) ✓
+  afterSwap oneForZero ✓        Full close: add→swap→remove ✓
+  IL with price change ✓        Direct remove + IL compensated ✓
 ```
 
 ### File Structure
 
 ```
 okx-ilguard/
-├── src/ILGuardHook.sol                 # Hook contract (final: sqrtPriceX96 + premiums)
+├── src/ILGuardHook.sol                 # Hook contract (~6KB, final version)
 ├── test/
 │   ├── ILGuardHook.t.sol               # 9 unit tests
 │   └── ILGuardHook.integration.t.sol   # 9 integration tests (real PoolManager)
-├── script/                             # Deployment & demo scripts
+├── script/
+│   ├── 01_DeployILGuard.s.sol          # CREATE2 HookMiner + deploy
+│   ├── 02_DeployMockTokensAndPool.s.sol # Deploy tokens + init V4 pool
+│   ├── 03_FundReserve.s.sol            # Fund insurance reserve
+│   └── 04_DemoFlow.s.sol              # add → swap → remove demo
+├── .github/workflows/test.yml          # CI: build + fmt + test
 ├── foundry.toml
 └── README.md
 ```
-
-### Mainnet Deployment (X Layer chain 196)
-
-| Contract | Address |
-|---|---|
-| ILGuardHook | `0x043b00Ae5d234e6c34107D60bFb663e7088a8744` |
-| MockToken0 | `0x046EAE536455FE1EE1b78e9c0e3e13d55eDBe921` |
-| MockToken1 | `0xFe9049a12EF8e658F56D33734C0B0aEEe80824aF` |
-| Uniswap PoolManager | `0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32` (official) |
-| Hook permission bits | `0x0740` |
-| PoolId | `0x6f91ddd9bcd951400001e39c4d33eef23fb90c80d62a9bb3c967367e95432186` |
-
-### Test Coverage
-
-```
-18 tests: 18 PASSED
-
-Unit (9):                     Integration (9):
-  Snapshot with price ✓         Pool initialized with hook ✓
-  Non-full-range revert ✓       Hook permissions validated ✓
-  Not-pool-manager revert ✓     Full-range add (router LP) ✓
-  Remove without snapshot ✓     Full-range add (hookData=realLp) ✓
-  IL detection + compensation ✓ Non-full-range revert (real PM) ✓
-  Reserve funding ✓             Real swap → premium accrued ✓
-  afterSwap hookDelta ✓         Real PM remove (no IL) ✓
-  afterSwap oneForZero ✓        Full close: add→swap→remove ✓
-  IL with price change ✓        Direct remove + IL compensated ✓
-```
-
-### X Layer Mainnet Transactions
-
-| Action | Tx Hash |
-|---|---|
-| Deploy Hook | `0x563f...` |
-| Initialize V4 Pool | `0xbbc6...` |
-| Fund Reserve | `0xb9f9...` |
-| Add Liquidity | `0x2977...` |
-| Swap (premium) | `0x77cd...` |
-| Remove Liquidity | `0x4cfe...` |
-
-### Future Upgrades
-
-1. **Multi-currency compensation** — pay in either token
-2. **Concentrated liquidity** — support non-full-range positions
-3. **Actuarial reserve model** — cross-pool risk pooling
-4. **Real premium settlement** — `afterSwapReturnDelta` with proper token custody
 
 ---
 
 ## 中文
 
+### ⚡ 评委 60 秒路径
+
+1. **查看链上 Hook**：[X Layer 浏览器](https://www.okx.com/explorer/xlayer/address/0x043b00Ae5d234e6c34107D60bFb663e7088a8744) — 已部署、已验证、已绑定 V4 池。
+2. **验证生命周期**：8 笔链上交易完成 add→swap→remove 闭环（见 [X Layer 主网证明](#x-layer-主网证明)）。
+3. **跑测试**：`forge test -vvv` — 18/18 通过，9 个集成测试使用真实 PoolManager。
+4. **看演示**：[2 分钟视频](https://x.com/ThreeOclock_CN/status/2059224654519091393)。
+
 ### 核心功能
 
-OKX-ILGuard 是一个 Uniswap V4 Hook：
-
-- **记录** LP 入场头寸，使用 sqrtPriceX96 进行价格加权估值。
-- **跟踪** 每次 swap 产生的手续费（输出的 15 BPS）。
-- **补偿** LP 从预充值储备金中支取，当无常损失超过 5% 时自动触发。
-
-### 特性
-
-| 特性 | 说明 |
-|---|---|
-| sqrtPriceX96 IL 计算 | 价格加权的存取款价值，非简单加法 |
-| 保费跟踪 | `afterSwap` 累加 `totalPremiumsAccrued` |
-| 全范围强制 | 非全范围头寸在添加/移除时被拒绝 |
-| IL 阈值 | 仅当损失 > 5% 时触发补偿（可配置） |
-| token0 补偿 | 从保险储备金直接 ERC20 转账 |
-
-### Hook 生命周期
-
-| Hook | 行为 |
-|---|---|
-| `afterAddLiquidity` | 记录 `PositionSnapshot` (amount0, amount1, sqrtPriceX96)。拒绝非全范围。 |
-| `afterSwap` | 计算保费（15 BPS × 输出量），发出 `InsurancePremiumAccrued`。 |
-| `beforeRemoveLiquidity` | 验证全范围 tick 边界。 |
-| `afterRemoveLiquidity` | 比较价格加权存取款价值，若 IL > 阈值则从储备金补偿。 |
+- **记录** LP 入场头寸，使用 `sqrtPriceX96` 进行价格加权估值。
+- **跟踪** 每次 swap 的保费（输出量的 15 BPS）。
+- **补偿** LP：当无常损失 > 5%，从预充值储备金自动转账。
 
 ### 快速开始
 
 ```bash
+git clone https://github.com/Souler-S/OKX-ILGuard.git
+cd OKX-ILGuard
 forge install
-forge test -vvv                        # 18 个测试全部通过
-forge test --match-contract ILGuardHookIntegrationTest -vvv
+forge build --sizes
+forge test -vvv                          # 18 个测试
+forge test --match-contract ILGuardHookIntegrationTest -vvv  # 集成测试
+forge fmt --check
 ```
 
-### 测试覆盖
+### X Layer 主网证明
+
+8 笔交易全部在 X Layer 主网 (chain 196) 执行。每笔交易附 OKX 浏览器链接。
+
+| # | 操作 | 交易哈希 | 证明内容 |
+|---|---|---|---|
+| 1 | 部署 Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook 字节码上链，权限位 0x0740 |
+| 2 | 部署 Token0 | [`0x6639...5411`](https://www.okx.com/explorer/xlayer/tx/0x663967aca4a6f199f8050ee0f590001f8688edf34be1fc7d14f2af1615a05411) | MockERC20 代币0 |
+| 3 | 部署 Token1 | [`0xafea...c781`](https://www.okx.com/explorer/xlayer/tx/0xafea393e249949a88b3c23d79bd5122edc53038cce56f69c43d30bd89260c781) | MockERC20 代币1 |
+| 4 | 初始化池 | [`0xbbc6...2c33`](https://www.okx.com/explorer/xlayer/tx/0xbbc6f3fdaf6403951efe25aa2096cc4d9f32037adecfe3264891ff751f1b2c33) | V4 池创建，绑定 ILGuardHook |
+| 5 | 充值储备金 | [`0xb9f9...d30c`](https://www.okx.com/explorer/xlayer/tx/0xb9f9362a51dd9f0d61bf9b3b599534f665abfc912ca47f3cd007f96e313dd30c) | 10 ether 转入保险储备金 |
+| 6 | 添加流动性 | [`0x2977...8739`](https://www.okx.com/explorer/xlayer/tx/0x2977b45ab69829f59c72af013f237b3c86f11700e4d052496f5bb90dfebc8739) | `PositionSnapshotRecorded` 事件 |
+| 7 | Swap | [`0x77cd...70db`](https://www.okx.com/explorer/xlayer/tx/0x77cd00e027065a7f9c664330c80cca77054b4c72e2f8a99d9774d26d5f2c70db) | `InsurancePremiumAccrued` 事件 |
+| 8 | 移除流动性 | [`0x4cfe...bedd`](https://www.okx.com/explorer/xlayer/tx/0x4cfe82e524041a6df0011abdaf3a51b75fe7cbe622acbc6d1111420fbe37bedd) | 完整闭环，快照已清除 |
+
+### 链上状态（DemoFlow 后）
 
 ```
-18 个测试：全部通过
+Hook 地址:   0x043b00Ae5d234e6c34107D60bFb663e7088a8744
+Token0:     0x046EAE536455FE1EE1b78e9c0e3e13d55eDBe921
+Token1:     0xFe9049a12EF8e658F56D33734C0B0aEEe80824aF
+PoolId:     0x6f91ddd9bcd951400001e39c4d33eef23fb90c80d62a9bb3c967367e95432186
+PoolManager: 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32 (Uniswap V4 官方)
 
-单元测试 (9):                 集成测试 (9):
-  含价格快照 ✓                 池初始化绑定 Hook ✓
-  非全范围拒绝 ✓               Hook 权限验证 ✓
-  非 PoolManager 拒绝 ✓        全范围添加（默认 LP） ✓
-  无快照移除 ✓                 全范围添加（hookData=realLp） ✓
-  IL 检测 + 补偿 ✓             非全范围拒绝（真实 PM） ✓
-  储备金充值 ✓                 真实 swap → 保费累计 ✓
-  afterSwap hookDelta ✓        真实 PM 移除（无 IL） ✓
-  afterSwap oneForZero ✓       完整闭环：add→swap→remove ✓
-  价格变动的 IL ✓              直接移除 + IL 补偿 ✓
+positions(poolId, deployer):  (0, 0, 0, false)  ← 移除后快照清除
+reserves(poolId).balance:     10 ether          ← 准备金就绪
+reserves(poolId).premiums:    > 0               ← swap 保费已记录
 ```
+
+### 特性 / 测试覆盖 / 文件结构
+
+见上方 English 章节对应表格。
 
 ---
 
