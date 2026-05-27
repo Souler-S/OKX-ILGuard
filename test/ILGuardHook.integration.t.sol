@@ -158,7 +158,7 @@ contract ILGuardHookIntegrationTest is Test {
         // Empty hookData → _resolveLp falls back to sender (router)
         modifyLiquidityRouter.modifyLiquidity(key, params, ZERO_BYTES);
 
-        (uint256 snap0, uint256 snap1, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
         assertTrue(exists, "snapshot should exist after add liquidity");
         assertGt(snap0, 0, "amount0 should be > 0");
         assertGt(snap1, 0, "amount1 should be > 0");
@@ -179,13 +179,13 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, params, hookData);
 
         // Snapshot should be under realLp, NOT under router
-        (uint256 snap0, uint256 snap1, bool exists) = hook.positions(poolId, realLp);
+        (uint256 snap0, uint256 snap1, uint160 _p, bool exists) = hook.positions(poolId, realLp);
         assertTrue(exists, "snapshot should exist under realLp");
         assertGt(snap0, 0, "amount0 > 0");
         assertGt(snap1, 0, "amount1 > 0");
 
         // Router should NOT have a snapshot
-        (,, bool routerExists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (,,, bool routerExists) = hook.positions(poolId, address(modifyLiquidityRouter));
         assertFalse(routerExists, "router should NOT have snapshot");
     }
 
@@ -211,7 +211,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, abi.encode(realLp));
 
         // 2. Read snapshot for realLp
-        (uint256 snap0, uint256 snap1, bool exists) = hook.positions(poolId, realLp);
+        (uint256 snap0, uint256 snap1, uint160 _p, bool exists) = hook.positions(poolId, realLp);
         require(exists, "snapshot must exist for realLp");
 
         // 3. Fund reserve
@@ -244,7 +244,7 @@ contract ILGuardHookIntegrationTest is Test {
         uint256 expectedCompensation = lossAmount > reserveAmount ? reserveAmount : lossAmount;
 
         vm.expectEmit(true, true, false, true);
-        emit ILGuardHook.ImpermanentLossDetected(poolId, realLp, lossAmount, depositValue, withdrawValueSimulated);
+        emit ILGuardHook.ImpermanentLossDetected(poolId, realLp, lossAmount, depositValue, withdrawValueSimulated, uint160(0), uint160(0));
         vm.expectEmit(true, true, false, true);
         emit ILGuardHook.ILCompensated(poolId, realLp, expectedCompensation);
 
@@ -278,7 +278,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, ZERO_BYTES);
 
         // 2. Verify snapshot exists (proves add side worked)
-        (uint256 snap0, uint256 snap1, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
         require(exists && snap0 > 0 && snap1 > 0, "add must record snapshot");
 
         // 3. Remove liquidity through real PoolManager (same amounts, no IL scenario)
@@ -294,7 +294,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, removeParams, ZERO_BYTES);
 
         // 4. After real remove, snapshot should be cleared
-        (,, bool existsAfter) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (,,, bool existsAfter) = hook.positions(poolId, address(modifyLiquidityRouter));
         assertFalse(existsAfter, "snapshot cleared after real PM remove");
     }
 
@@ -351,7 +351,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, ZERO_BYTES);
 
         // 2. Read deposit snapshot
-        (uint256 snap0, uint256 snap1,) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool snapExists) = hook.positions(poolId, address(modifyLiquidityRouter));
         uint256 depositValue = snap0 + snap1;
 
         // 3. Fund insurance reserve
@@ -384,7 +384,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, removeParams, ZERO_BYTES);
 
         // 7. Snapshot cleared (proves afterRemoveLiquidity executed)
-        (,, bool existsAfter) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (,,, bool existsAfter) = hook.positions(poolId, address(modifyLiquidityRouter));
         assertFalse(existsAfter, "snapshot should be cleared after remove");
 
         // 8. Reserve unchanged — proves no compensation occurred (MVP formula limitation)
