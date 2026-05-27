@@ -1,5 +1,7 @@
 # OKX-ILGuard — Impermanent Loss Protection Hook for Uniswap V4
 
+
+[![CI](https://github.com/Souler-S/OKX-ILGuard/actions/workflows/test.yml/badge.svg)](https://github.com/Souler-S/OKX-ILGuard/actions/workflows/test.yml)
 [English](#english) | [中文](#中文)
 
 > **One-liner / 一句话**: Automatic impermanent loss compensation for Uniswap V4 full-range LPs.
@@ -66,6 +68,7 @@ okx-ilguard/
 | MockToken1 | `0xFe9049a12EF8e658F56D33734C0B0aEEe80824aF` |
 | Uniswap PoolManager | `0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32` (official) |
 | Hook permission bits | `0x0740` |
+| PoolId | `0x6f91ddd9bcd951400001e39c4d33eef23fb90c80d62a9bb3c967367e95432186` |
 
 ### Test Coverage
 
