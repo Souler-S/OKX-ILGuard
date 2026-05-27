@@ -33,8 +33,13 @@ contract ILGuardHook is IHooks {
     );
     event InsurancePremiumAccrued(PoolId indexed poolId, uint256 amount);
     event ImpermanentLossDetected(
-        PoolId indexed poolId, address indexed lp, uint256 lossAmount,
-        uint256 depositValue, uint256 withdrawValue, uint160 depositPrice, uint160 currentPrice
+        PoolId indexed poolId,
+        address indexed lp,
+        uint256 lossAmount,
+        uint256 depositValue,
+        uint256 withdrawValue,
+        uint160 depositPrice,
+        uint160 currentPrice
     );
     event ILCompensated(PoolId indexed poolId, address indexed lp, uint256 compensationAmount);
 
@@ -106,7 +111,9 @@ contract ILGuardHook is IHooks {
     }
 
     function _computePositionValue(uint256 amount0, uint256 amount1, uint160 sqrtPriceX96)
-        internal pure returns (uint256)
+        internal
+        pure
+        returns (uint256)
     {
         if (sqrtPriceX96 == 0) return amount0 + amount1;
         uint256 price = _priceFromSqrtPriceX96(sqrtPriceX96);
@@ -114,11 +121,17 @@ contract ILGuardHook is IHooks {
     }
 
     function afterAddLiquidity(
-        address sender, PoolKey calldata key, ModifyLiquidityParams calldata params,
-        BalanceDelta delta, BalanceDelta, bytes calldata hookData
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta,
+        bytes calldata hookData
     ) external override onlyPoolManager returns (bytes4, BalanceDelta) {
-        if (params.tickLower != TickMath.minUsableTick(key.tickSpacing)
-            || params.tickUpper != TickMath.maxUsableTick(key.tickSpacing)) revert NotFullRange();
+        if (
+            params.tickLower != TickMath.minUsableTick(key.tickSpacing)
+                || params.tickUpper != TickMath.maxUsableTick(key.tickSpacing)
+        ) revert NotFullRange();
 
         PoolId poolId = key.toId();
         address lp = _resolveLp(sender, hookData);
@@ -134,17 +147,25 @@ contract ILGuardHook is IHooks {
     }
 
     function beforeRemoveLiquidity(
-        address sender, PoolKey calldata key, ModifyLiquidityParams calldata params,
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
         bytes calldata
     ) external override onlyPoolManager returns (bytes4) {
-        if (params.tickLower != TickMath.minUsableTick(key.tickSpacing)
-            || params.tickUpper != TickMath.maxUsableTick(key.tickSpacing)) revert NotFullRange();
+        if (
+            params.tickLower != TickMath.minUsableTick(key.tickSpacing)
+                || params.tickUpper != TickMath.maxUsableTick(key.tickSpacing)
+        ) revert NotFullRange();
         return IHooks.beforeRemoveLiquidity.selector;
     }
 
     function afterRemoveLiquidity(
-        address sender, PoolKey calldata key, ModifyLiquidityParams calldata,
-        BalanceDelta delta, BalanceDelta, bytes calldata hookData
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata,
+        BalanceDelta delta,
+        BalanceDelta,
+        bytes calldata hookData
     ) external override onlyPoolManager returns (bytes4, BalanceDelta) {
         PoolId poolId = key.toId();
         address lp = _resolveLp(sender, hookData);
@@ -163,14 +184,19 @@ contract ILGuardHook is IHooks {
         if (withdrawValue < depositValue) {
             uint256 loss = depositValue - withdrawValue;
             uint256 threshold = (depositValue * compensationThresholdBps) / 10000;
-            emit ImpermanentLossDetected(poolId, lp, loss, depositValue, withdrawValue, snapshot.sqrtPriceX96, currentPrice);
+            emit ImpermanentLossDetected(
+                poolId, lp, loss, depositValue, withdrawValue, snapshot.sqrtPriceX96, currentPrice
+            );
 
             if (loss > threshold) {
                 InsuranceReserve storage reserve = reserves[poolId];
                 uint256 compensation = loss > reserve.balance ? reserve.balance : loss;
                 if (compensation > 0) {
                     reserve.balance -= compensation;
-                    require(IERC20Minimal(Currency.unwrap(key.currency0)).transfer(lp, compensation), "ILGuard: transfer failed");
+                    require(
+                        IERC20Minimal(Currency.unwrap(key.currency0)).transfer(lp, compensation),
+                        "ILGuard: transfer failed"
+                    );
                     emit ILCompensated(poolId, lp, compensation);
                 }
             }
@@ -180,10 +206,12 @@ contract ILGuardHook is IHooks {
         return (IHooks.afterRemoveLiquidity.selector, BalanceDeltaLibrary.ZERO_DELTA);
     }
 
-    function afterSwap(
-        address, PoolKey calldata key, SwapParams calldata params,
-        BalanceDelta delta, bytes calldata
-    ) external override onlyPoolManager returns (bytes4, int128) {
+    function afterSwap(address, PoolKey calldata key, SwapParams calldata params, BalanceDelta delta, bytes calldata)
+        external
+        override
+        onlyPoolManager
+        returns (bytes4, int128)
+    {
         PoolId poolId = key.toId();
         int128 amount0 = delta.amount0();
         int128 amount1 = delta.amount1();
@@ -214,15 +242,51 @@ contract ILGuardHook is IHooks {
         return (IHooks.afterSwap.selector, hookDelta);
     }
 
-    function beforeInitialize(address, PoolKey calldata, uint160) external override returns (bytes4) { revert HookNotImplemented(); }
-    function afterInitialize(address, PoolKey calldata, uint160, int24) external override returns (bytes4) { revert HookNotImplemented(); }
-    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata) external override returns (bytes4) { revert HookNotImplemented(); }
-    function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata) external override returns (bytes4, BeforeSwapDelta, uint24) { revert HookNotImplemented(); }
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external override returns (bytes4) { revert HookNotImplemented(); }
-    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external override returns (bytes4) { revert HookNotImplemented(); }
+    function beforeInitialize(address, PoolKey calldata, uint160) external override returns (bytes4) {
+        revert HookNotImplemented();
+    }
+
+    function afterInitialize(address, PoolKey calldata, uint160, int24) external override returns (bytes4) {
+        revert HookNotImplemented();
+    }
+
+    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        external
+        override
+        returns (bytes4)
+    {
+        revert HookNotImplemented();
+    }
+
+    function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
+        external
+        override
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        revert HookNotImplemented();
+    }
+
+    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external
+        override
+        returns (bytes4)
+    {
+        revert HookNotImplemented();
+    }
+
+    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external
+        override
+        returns (bytes4)
+    {
+        revert HookNotImplemented();
+    }
 
     function fundReserve(PoolKey calldata key, uint256 amount) external {
-        require(IERC20Minimal(Currency.unwrap(key.currency0)).transferFrom(msg.sender, address(this), amount), "ILGuard: transferFrom failed");
+        require(
+            IERC20Minimal(Currency.unwrap(key.currency0)).transferFrom(msg.sender, address(this), amount),
+            "ILGuard: transferFrom failed"
+        );
         reserves[key.toId()].balance += amount;
     }
 }

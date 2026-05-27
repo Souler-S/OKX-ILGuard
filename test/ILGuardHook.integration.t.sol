@@ -158,7 +158,8 @@ contract ILGuardHookIntegrationTest is Test {
         // Empty hookData → _resolveLp falls back to sender (router)
         modifyLiquidityRouter.modifyLiquidity(key, params, ZERO_BYTES);
 
-        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) =
+            hook.positions(poolId, address(modifyLiquidityRouter));
         assertTrue(exists, "snapshot should exist after add liquidity");
         assertGt(snap0, 0, "amount0 should be > 0");
         assertGt(snap1, 0, "amount1 should be > 0");
@@ -244,7 +245,9 @@ contract ILGuardHookIntegrationTest is Test {
         uint256 expectedCompensation = lossAmount > reserveAmount ? reserveAmount : lossAmount;
 
         vm.expectEmit(true, true, false, true);
-        emit ILGuardHook.ImpermanentLossDetected(poolId, realLp, lossAmount, depositValue, withdrawValueSimulated, uint160(0), uint160(0));
+        emit ILGuardHook.ImpermanentLossDetected(
+            poolId, realLp, lossAmount, depositValue, withdrawValueSimulated, uint160(0), uint160(0)
+        );
         vm.expectEmit(true, true, false, true);
         emit ILGuardHook.ILCompensated(poolId, realLp, expectedCompensation);
 
@@ -278,7 +281,8 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, ZERO_BYTES);
 
         // 2. Verify snapshot exists (proves add side worked)
-        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool exists) =
+            hook.positions(poolId, address(modifyLiquidityRouter));
         require(exists && snap0 > 0 && snap1 > 0, "add must record snapshot");
 
         // 3. Remove liquidity through real PoolManager (same amounts, no IL scenario)
@@ -351,7 +355,8 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, ZERO_BYTES);
 
         // 2. Read deposit snapshot
-        (uint256 snap0, uint256 snap1, uint160 _sp, bool snapExists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 _sp, bool snapExists) =
+            hook.positions(poolId, address(modifyLiquidityRouter));
         uint256 depositValue = snap0 + snap1;
 
         // 3. Fund insurance reserve

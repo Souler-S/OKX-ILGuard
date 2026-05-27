@@ -48,11 +48,22 @@ contract ILGuardHookTest is Test {
     }
 
     function _makePoolKey() internal view returns (PoolKey memory) {
-        return PoolKey(Currency.wrap(address(token0)), Currency.wrap(address(token1)), 3000, DEFAULT_TICK_SPACING, IHooks(address(hook)));
+        return PoolKey(
+            Currency.wrap(address(token0)),
+            Currency.wrap(address(token1)),
+            3000,
+            DEFAULT_TICK_SPACING,
+            IHooks(address(hook))
+        );
     }
 
     function _makeFullRangeParams(int256 liquidityDelta) internal view returns (ModifyLiquidityParams memory) {
-        return ModifyLiquidityParams(TickMath.minUsableTick(DEFAULT_TICK_SPACING), TickMath.maxUsableTick(DEFAULT_TICK_SPACING), liquidityDelta, bytes32(0));
+        return ModifyLiquidityParams(
+            TickMath.minUsableTick(DEFAULT_TICK_SPACING),
+            TickMath.maxUsableTick(DEFAULT_TICK_SPACING),
+            liquidityDelta,
+            bytes32(0)
+        );
     }
 
     function _depositDelta(uint128 a0, uint128 a1) internal pure returns (BalanceDelta) {
@@ -84,12 +95,16 @@ contract ILGuardHookTest is Test {
         vm.expectEmit(true, true, false, true);
         emit ILGuardHook.PositionSnapshotRecorded(key.toId(), lp, 100 ether, 100 ether, PRICE_1_1);
 
-        (bytes4 sel, BalanceDelta rd) = hook.afterAddLiquidity(lp, key, params, delta, BalanceDeltaLibrary.ZERO_DELTA, hd);
+        (bytes4 sel, BalanceDelta rd) =
+            hook.afterAddLiquidity(lp, key, params, delta, BalanceDeltaLibrary.ZERO_DELTA, hd);
         assertEq(sel, IHooks.afterAddLiquidity.selector);
         assertEq(BalanceDelta.unwrap(rd), BalanceDelta.unwrap(BalanceDeltaLibrary.ZERO_DELTA));
 
         (uint256 s0, uint256 s1, uint160 sp, bool exists) = hook.positions(key.toId(), lp);
-        assertEq(s0, 100 ether); assertEq(s1, 100 ether); assertEq(sp, PRICE_1_1); assertTrue(exists);
+        assertEq(s0, 100 ether);
+        assertEq(s1, 100 ether);
+        assertEq(sp, PRICE_1_1);
+        assertTrue(exists);
     }
 
     // ============ Test 2: Non-full-range reverts ============
@@ -105,11 +120,14 @@ contract ILGuardHookTest is Test {
 
     function test_fundReserve() public {
         PoolKey memory key = _makePoolKey();
-        vm.prank(funder); token0.approve(address(hook), 1000 ether);
-        vm.prank(funder); hook.fundReserve(key, 1000 ether);
+        vm.prank(funder);
+        token0.approve(address(hook), 1000 ether);
+        vm.prank(funder);
+        hook.fundReserve(key, 1000 ether);
         assertEq(token0.balanceOf(address(hook)), 1000 ether);
         (uint256 bal, uint256 acc) = hook.reserves(key.toId());
-        assertEq(bal, 1000 ether); assertEq(acc, 0);
+        assertEq(bal, 1000 ether);
+        assertEq(acc, 0);
     }
 
     // ============ Test 4: Not-pool-manager reverts ============
@@ -117,14 +135,28 @@ contract ILGuardHookTest is Test {
     function test_notPoolManager_Reverts() public {
         PoolKey memory key = _makePoolKey();
         vm.expectRevert(ILGuardHook.NotPoolManager.selector);
-        hook.afterAddLiquidity(lp, key, _makeFullRangeParams(int256(100 ether)), _depositDelta(100 ether, 100 ether), BalanceDeltaLibrary.ZERO_DELTA, "");
+        hook.afterAddLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(int256(100 ether)),
+            _depositDelta(100 ether, 100 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            ""
+        );
     }
 
     // ============ Test 5: Remove with no snapshot ============
 
     function test_afterRemoveLiquidity_NoSnapshot() public prankPoolManager {
         PoolKey memory key = _makePoolKey();
-        (bytes4 sel,) = hook.afterRemoveLiquidity(lp, key, _makeFullRangeParams(-int256(50 ether)), _withdrawDelta(50 ether, 50 ether), BalanceDeltaLibrary.ZERO_DELTA, "");
+        (bytes4 sel,) = hook.afterRemoveLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(-int256(50 ether)),
+            _withdrawDelta(50 ether, 50 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            ""
+        );
         assertEq(sel, IHooks.afterRemoveLiquidity.selector);
     }
 
@@ -136,11 +168,20 @@ contract ILGuardHookTest is Test {
 
         // 1. Add liquidity at 1:1 price
         vm.prank(address(mockPM));
-        hook.afterAddLiquidity(lp, key, _makeFullRangeParams(int256(100 ether)), _depositDelta(100 ether, 100 ether), BalanceDeltaLibrary.ZERO_DELTA, hd);
+        hook.afterAddLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(int256(100 ether)),
+            _depositDelta(100 ether, 100 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            hd
+        );
 
         // 2. Fund reserve
-        vm.prank(funder); token0.approve(address(hook), 10 ether);
-        vm.prank(funder); hook.fundReserve(key, 10 ether);
+        vm.prank(funder);
+        token0.approve(address(hook), 10 ether);
+        vm.prank(funder);
+        hook.fundReserve(key, 10 ether);
 
         // 3. Price moves → IL: withdraw less than deposit
         // With same 1:1 price, but simulate IL by withdrawing 94 each instead of 100
@@ -152,7 +193,14 @@ contract ILGuardHookTest is Test {
         emit ILGuardHook.ILCompensated(key.toId(), lp, 10 ether);
 
         vm.prank(address(mockPM));
-        hook.afterRemoveLiquidity(lp, key, _makeFullRangeParams(-int256(100 ether)), _withdrawDelta(94 ether, 94 ether), BalanceDeltaLibrary.ZERO_DELTA, hd);
+        hook.afterRemoveLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(-int256(100 ether)),
+            _withdrawDelta(94 ether, 94 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            hd
+        );
 
         assertEq(token0.balanceOf(lp), lpBalBefore + 10 ether, "compensation received");
         assertEq(token0.balanceOf(address(hook)), 0, "reserve drained");
@@ -202,11 +250,20 @@ contract ILGuardHookTest is Test {
 
         // 1. Deposit at 1:1 price
         vm.prank(address(mockPM));
-        hook.afterAddLiquidity(lp, key, _makeFullRangeParams(int256(100 ether)), _depositDelta(100 ether, 100 ether), BalanceDeltaLibrary.ZERO_DELTA, hdAdd);
+        hook.afterAddLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(int256(100 ether)),
+            _depositDelta(100 ether, 100 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            hdAdd
+        );
 
         // 2. Fund reserve
-        vm.prank(funder); token0.approve(address(hook), 50 ether);
-        vm.prank(funder); hook.fundReserve(key, 50 ether);
+        vm.prank(funder);
+        token0.approve(address(hook), 50 ether);
+        vm.prank(funder);
+        hook.fundReserve(key, 50 ether);
 
         // 3. Price drops 50%: new sqrtPriceX96 = PRICE_1_1 / sqrt(2)
         // sqrt(0.5) * 2^96 ≈ 56022770974786141989127813161
@@ -225,7 +282,14 @@ contract ILGuardHookTest is Test {
         // loss = 20, threshold = 150*5% = 7.5 → triggers
 
         vm.prank(address(mockPM));
-        hook.afterRemoveLiquidity(lp, key, _makeFullRangeParams(-int256(100 ether)), _withdrawDelta(80 ether, 90 ether), BalanceDeltaLibrary.ZERO_DELTA, hdRemove);
+        hook.afterRemoveLiquidity(
+            lp,
+            key,
+            _makeFullRangeParams(-int256(100 ether)),
+            _withdrawDelta(80 ether, 90 ether),
+            BalanceDeltaLibrary.ZERO_DELTA,
+            hdRemove
+        );
 
         assertGt(token0.balanceOf(lp), lpBalBefore, "should receive compensation");
     }
