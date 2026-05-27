@@ -3,7 +3,7 @@
 ## Code & Tests
 
 - [x] `forge build` passes (0 errors)
-- [x] `forge test -vvv` passes (15/15 tests)
+- [x] `forge test -vvv` passes (18/18 tests)
 - [x] No `.secrets/` files committed
 - [x] No `cache/` files committed
 - [x] No `broadcast/**/dry-run/` files committed
