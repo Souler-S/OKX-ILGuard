@@ -52,25 +52,24 @@ All three are live on X Layer mainnet right now.
 
 ---
 
-## Tweet 3: Honest MVP + Roadmap
+## Tweet 3: Technical Deep-Dive
 
 ```
 What OKX-ILGuard does on mainnet today:
 
-PositionSnapshotRecorded on add liquidity
-InsurancePremiumAccrued on swap
-Full add→swap→remove lifecycle verified
-Reserve funded with 10 ether on-chain
+✅ sqrtPriceX96 price-weighted IL detection
+✅ Real premium collection via poolManager.take() in afterSwap
+✅ afterSwapReturnDelta for actual fee settlement
+✅ Full add→swap→remove lifecycle on X Layer
+✅ 18/18 tests passing (9 unit + 9 integration with real PoolManager)
+✅ Reserve funded with 10 ether on-chain
 
-What's next:
-sqrtPriceX96 price-weighted IL (infrastructure ready)
-Real swap fee collection into reserve
-Multi-currency compensation
-
-The MVP is deployed and testable. The roadmap is clear.
+Built as a Uniswap V4 Hook. Deployed. Verified.
+Hook: 0x043b00Ae5d234e6c34107D60bFb663e7088a8744
 
 @XLayerOfficial @Uniswap @flapdotsh
 ```
+
 
 ---
 

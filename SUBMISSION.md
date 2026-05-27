@@ -55,7 +55,7 @@ PoolManager: 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32
 
 | Component | Detail |
 |---|---|
-| Hook permissions | `0x0740` (afterAddLiquidity, beforeRemoveLiquidity, afterRemoveLiquidity, afterSwap) |
+| Hook permissions | `0x0744` (afterAddLiquidity, beforeRemoveLiquidity, afterRemoveLiquidity, afterSwap, afterSwapReturnDelta) |
 | IL calculation | `_computePositionValue(amount0, amount1, sqrtPriceX96)` — price-weighted |
 | Premium rate | 15 BPS of swap output |
 | IL threshold | 5% (`compensationThresholdBps = 500`) |

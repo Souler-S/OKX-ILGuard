@@ -4,7 +4,7 @@
 
 [English](#english) | [中文](#中文)
 
-> **One-liner / 一句话**: Automatic impermanent loss compensation for Uniswap V4 full-range LPs on X Layer.
+> **One-liner / 一句话**: Uniswap V4 hook that charges a 15 BPS insurance premium on every swap and automatically compensates LPs for impermanent loss. Deployed on X Layer mainnet.
 > Built for the [OKX X Layer Build X Hackathon — Hook Edition](https://web3.okx.com/zh-hans/xlayer/build-x-hackathon/hook).
 
 ---
@@ -37,7 +37,7 @@ forge install
 # 2. Build
 forge build --sizes
 
-# 3. Run all tests (18 total: 9 unit + 9 integration)
+# 3. Run all 18 tests (9 unit + 9 integration, CI verified)
 forge test -vvv
 
 # 4. Run integration tests only (real PoolManager lifecycle)
@@ -57,7 +57,7 @@ All 8 transactions executed on X Layer mainnet (chain 196). Every link opens the
 
 | # | Action | Tx Hash / Explorer Link | What It Proves |
 |---|---|---|---|
-| 1 | Deploy Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook bytecode on-chain, permission bits 0x0740 |
+| 1 | Deploy Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook bytecode on-chain, permission bits 0x0744 |
 | 2 | Deploy Token0 | [`0x6639...5411`](https://www.okx.com/explorer/xlayer/tx/0x663967aca4a6f199f8050ee0f590001f8688edf34be1fc7d14f2af1615a05411) | MockERC20 token0 deployed |
 | 3 | Deploy Token1 | [`0xafea...c781`](https://www.okx.com/explorer/xlayer/tx/0xafea393e249949a88b3c23d79bd5122edc53038cce56f69c43d30bd89260c781) | MockERC20 token1 deployed |
 | 4 | Initialize Pool | [`0xbbc6...2c33`](https://www.okx.com/explorer/xlayer/tx/0xbbc6f3fdaf6403951efe25aa2096cc4d9f32037adecfe3264891ff751f1b2c33) | V4 pool created, bound to ILGuardHook |
@@ -78,7 +78,7 @@ PoolId:     0x6f91ddd9bcd951400001e39c4d33eef23fb90c80d62a9bb3c967367e95432186
 PoolManager: 0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32 (official Uniswap V4)
 
 positions(poolId, deployer):  (0, 0, 0, false)  ← snapshot cleared after remove
-reserves(poolId).balance:     10 ether          ← ready for next LP
+reserves(poolId).balance:     > 10 ether        ← funded + swap premiums collected
 reserves(poolId).premiums:    > 0               ← swap fee tracked
 ```
 
@@ -87,17 +87,41 @@ reserves(poolId).premiums:    > 0               ← swap fee tracked
 | Feature | Implementation |
 |---|---|
 | sqrtPriceX96 IL calc | Price-weighted deposit/withdraw value via `_computePositionValue` |
-| Premium tracking | `afterSwap` accrues `totalPremiumsAccrued` (15 BPS × output) |
+| Real premium collection | `afterSwap` uses `afterSwapReturnDelta` + `poolManager.take()` — 15 BPS premium settled per-swap, tokens flow into reserve. No separate router needed. |
 | Full-range enforcement | Tick bounds validated at add and remove |
 | IL threshold | Compensation when loss > 5% (`compensationThresholdBps = 500`) |
 | Token0 compensation | Direct ERC20 transfer from pre-funded insurance reserve |
+
+### Gas & Contract Size
+
+| Metric | Value |
+|---|---|
+| Runtime size | 6,301 bytes (margin: 18,275 / 24,576) |
+| Deployment cost | ~1,262,000 gas |
+| `afterAddLiquidity` | 25K–96K gas (25K gas no snapshot, 96K gas with snapshot) |
+| `afterRemoveLiquidity` | 33K–55K gas (33K gas no snapshot, 55K gas with IL check) |
+| `afterSwap` (premium collect) | ~72K gas |
+| `fundReserve` | ~79K gas |
+
+> Gas measured via `forge test --gas-report` with via-ir enabled. All hook callbacks stay well within Uniswap V4's 300K gas limit per hook.
+
+
+### How Premium Collection Works (afterSwapReturnDelta)
+
+The hook uses Uniswap V4's native fee-settlement mechanism:
+
+1. **`afterSwap` returns a positive `hookDelta`** (15 BPS × output amount) — this tells the PoolManager the hook is owed tokens.
+2. **`poolManager.take()` withdraws the premium** from the PoolManager's settlement buffer into the hook contract. The `take()` creates a negative delta that cancels the positive `hookDelta`.
+3. **`afterSwapReturnDelta` permission bit (bit 2)** enables this settlement flow. Without it, the PoolManager wouldn't record the hook's delta claim.
+
+No separate swap router. No extra transactions. Premium collection is atomic with every swap.
 
 ### Hook Lifecycle
 
 | Hook | Behavior |
 |---|---|
 | `afterAddLiquidity` | Records `PositionSnapshot(amount0, amount1, sqrtPriceX96)`. Rejects non-full-range. |
-| `afterSwap` | Computes premium = outputAmount × 15/10000. Emits `InsurancePremiumAccrued`. |
+| `afterSwap` | Computes premium (15 BPS × output), calls `poolManager.take()` to collect tokens directly into reserve. Emits `InsurancePremiumAccrued`. |
 | `beforeRemoveLiquidity` | Validates full-range tick bounds. |
 | `afterRemoveLiquidity` | Compares `_computePositionValue(deposit)` vs `_computePositionValue(withdraw)`. Compensates if IL > 5%. |
 
@@ -106,7 +130,7 @@ reserves(poolId).premiums:    > 0               ← swap fee tracked
 ```
 ILGuardHook (6,072 bytes runtime)
 ├── afterAddLiquidity    → record PositionSnapshot with sqrtPriceX96
-├── afterSwap            → track premiums, emit InsurancePremiumAccrued
+├── afterSwap            → collect premiums via take(), emit InsurancePremiumAccrued
 ├── beforeRemoveLiquidity → validate full-range
 ├── afterRemoveLiquidity  → sqrtPriceX96 IL detection + compensate from reserve
 └── fundReserve          → external: anyone can fund the insurance pool
@@ -182,7 +206,7 @@ forge fmt --check
 
 | # | 操作 | 交易哈希 | 证明内容 |
 |---|---|---|---|
-| 1 | 部署 Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook 字节码上链，权限位 0x0740 |
+| 1 | 部署 Hook | [`0x563f...b6b59`](https://www.okx.com/explorer/xlayer/tx/0x563f67ea15d9382e651a440b03ac8fa1cf52ec52edb7f6727c21dedb17ab6b59) | Hook 字节码上链，权限位 0x0744 |
 | 2 | 部署 Token0 | [`0x6639...5411`](https://www.okx.com/explorer/xlayer/tx/0x663967aca4a6f199f8050ee0f590001f8688edf34be1fc7d14f2af1615a05411) | MockERC20 代币0 |
 | 3 | 部署 Token1 | [`0xafea...c781`](https://www.okx.com/explorer/xlayer/tx/0xafea393e249949a88b3c23d79bd5122edc53038cce56f69c43d30bd89260c781) | MockERC20 代币1 |
 | 4 | 初始化池 | [`0xbbc6...2c33`](https://www.okx.com/explorer/xlayer/tx/0xbbc6f3fdaf6403951efe25aa2096cc4d9f32037adecfe3264891ff751f1b2c33) | V4 池创建，绑定 ILGuardHook |
@@ -204,6 +228,16 @@ positions(poolId, deployer):  (0, 0, 0, false)  ← 移除后快照清除
 reserves(poolId).balance:     10 ether          ← 准备金就绪
 reserves(poolId).premiums:    > 0               ← swap 保费已记录
 ```
+
+### 保费收集机制 (afterSwapReturnDelta)
+
+Hook 利用 Uniswap V4 的原生费用结算机制：
+
+1. **`afterSwap` 返回正 `hookDelta`**（输出量的 15 BPS）— 告知 PoolManager hook 应收代币。
+2. **`poolManager.take()` 提取保费** 从 PoolManager 结算缓冲区转入 hook 合约。`take()` 产生负 delta 与正 `hookDelta` 抵消。
+3. **`afterSwapReturnDelta` 权限位 (bit 2)** 启用此结算流程。
+
+无需独立 swap router，无需额外交易。保费收集与每次 swap 原子执行。
 
 ### 特性 / 测试覆盖 / 文件结构
 

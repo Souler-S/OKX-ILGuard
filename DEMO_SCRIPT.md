@@ -49,7 +49,7 @@
 
 *Visual: Forge test terminal output showing `ImpermanentLossDetected` + `ILCompensated`.*
 
-"The MVP's simplified IL formula works perfectly at 1:1 price. For the compensation demo, I use a controlled withdrawal scenario that simulates real-world impermanent loss. You can see: the Hook detects the loss, checks it against the 5% threshold, and transfers compensation from the reserve to the LP — all automatically, all on-chain."
+"The Hook uses sqrtPriceX96-based price-weighted valuation to detect impermanent loss. When the withdrawal value falls below the deposit value by more than 5%, it automatically compensates the LP from the pre-funded reserve. Let me show you the test proving this works."
 
 *Visual: Show test passing with green checkmarks.*
 

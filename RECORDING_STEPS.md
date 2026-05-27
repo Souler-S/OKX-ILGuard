@@ -29,8 +29,8 @@ Goal: record a 2-minute screen video and use `OKX-ILGuard-voiceover.aiff` as the
 4. Show terminal verification:
 
 ```bash
-cd /Users/MacBook/Documents/Codex/2026-05-25/hi/okx-ilguard
-source /Users/MacBook/Documents/Codex/2026-05-25/hi/.secrets/okx-hackathon.env
+cd okx-ilguard
+source .secrets/okx-hackathon.env
 
 cast call "$ILGUARD_HOOK_ADDRESS" \
   "reserves(bytes32)(uint256,uint256)" \

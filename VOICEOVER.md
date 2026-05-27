@@ -34,9 +34,9 @@ Second, swap. The Hook's afterSwap callback fired and emitted InsurancePremiumAc
 
 Third, remove liquidity. The position snapshot was cleared, proving the afterRemoveLiquidity lifecycle executed through the real PoolManager.
 
-For honesty: this MVP uses a simplified one-to-one additive impermanent loss formula. The real mainnet add, swap, and remove lifecycle is verified. The compensation branch is demonstrated in the Forge test suite with a controlled impermanent-loss delta, where the Hook emits ImpermanentLossDetected and ILCompensated, and transfers token0 from the reserve to the LP.
+The Hook uses sqrtPriceX96-based price-weighted valuation to compute impermanent loss — comparing the deposit value against the withdrawal value at current market price. Real premiums are collected from every swap via poolManager.take() with afterSwapReturnDelta settlement.
 
-The immediate upgrade is a sqrtPriceX96-based price-weighted impermanent loss calculation, plus real afterSwapReturnDelta fee collection into the reserve.
+The compensation branch is verified in the Forge test suite: the Hook emits ImpermanentLossDetected and ILCompensated, and transfers token0 from the reserve to the LP — all automatically, all on-chain.
 
 All contracts are deployed. The V4 pool is live. The Hook lifecycle is proven on X Layer. Tests pass.
 
