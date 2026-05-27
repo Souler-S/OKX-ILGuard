@@ -242,16 +242,17 @@ contract ILGuardHook is IHooks {
         return (IHooks.afterSwap.selector, hookDelta);
     }
 
-    function beforeInitialize(address, PoolKey calldata, uint160) external override returns (bytes4) {
+    function beforeInitialize(address, PoolKey calldata, uint160) external pure override returns (bytes4) {
         revert HookNotImplemented();
     }
 
-    function afterInitialize(address, PoolKey calldata, uint160, int24) external override returns (bytes4) {
+    function afterInitialize(address, PoolKey calldata, uint160, int24) external pure override returns (bytes4) {
         revert HookNotImplemented();
     }
 
     function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
         external
+        pure
         override
         returns (bytes4)
     {
@@ -260,6 +261,7 @@ contract ILGuardHook is IHooks {
 
     function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
         external
+        pure
         override
         returns (bytes4, BeforeSwapDelta, uint24)
     {
@@ -268,6 +270,7 @@ contract ILGuardHook is IHooks {
 
     function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
         external
+        pure
         override
         returns (bytes4)
     {
@@ -276,6 +279,7 @@ contract ILGuardHook is IHooks {
 
     function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
         external
+        pure
         override
         returns (bytes4)
     {
