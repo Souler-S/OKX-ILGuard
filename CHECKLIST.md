@@ -35,12 +35,12 @@
 - [x] GitHub repository public: `https://github.com/Souler-S/OKX-ILGuard`
 - [ ] All mainnet addresses in README and SUBMISSION.md
 - [ ] All tx hashes in README and SUBMISSION.md
-- [ ] Demo video recorded (use `DEMO_SCRIPT.md`)
-- [ ] Demo video uploaded (YouTube or equivalent)
-- [ ] Demo video link in TWEET_DRAFTS.md and SUBMISSION.md
+- [x] Demo video recorded/generated (use `DEMO_SCRIPT.md`)
+- [x] Demo video uploaded via X post
+- [x] Demo video link in TWEET_DRAFTS.md and SUBMISSION.md: `https://x.com/ThreeOclock_CN/status/2059224654519091393?s=20`
 - [ ] Independent X/Twitter account created
 - [ ] X/Twitter account bio/profile updated for hackathon
-- [ ] Tweet 1 posted with `@XLayerOfficial @Uniswap @flapdotsh`
+- [x] Tweet 1 posted with `@XLayerOfficial @Uniswap @flapdotsh`
 - [ ] Tweet 2 posted (thread opener)
 - [ ] Tweet 3 posted (honest MVP + roadmap)
 - [ ] Consistent posting during event period

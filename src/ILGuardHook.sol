@@ -17,7 +17,7 @@ import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
 /// @notice A Uniswap V4 hook that provides automatic impermanent loss compensation
 ///         for full-range liquidity providers using a pre-funded insurance reserve.
 /// @dev Final version: sqrtPriceX96-based price-weighted IL calculation,
-///      real afterSwapReturnDelta premium collection into insurance reserve.
+///      premium tracking via swap fees.
 contract ILGuardHook is IHooks {
     using PoolIdLibrary for PoolKey;
     using Hooks for IHooks;
@@ -57,7 +57,7 @@ contract ILGuardHook is IHooks {
 
     uint16 public immutable insuranceBps;
     uint16 public immutable compensationThresholdBps;
-    uint160 public constant HOOK_PERMISSIONS = 0x0744;
+    uint160 public constant HOOK_PERMISSIONS = 0x0740;
 
     constructor(IPoolManager _poolManager, uint16 _insuranceBps, uint16 _compensationThresholdBps) {
         poolManager = _poolManager;
@@ -76,8 +76,11 @@ contract ILGuardHook is IHooks {
             assembly ("memory-safe") { lp := shr(96, calldataload(hookData.offset)) }
         } else if (len == 32) {
             assembly ("memory-safe") { lp := calldataload(hookData.offset) }
+        } else if (len >= 64) {
+            // abi.encode: address is left-padded in first 32 bytes
+            assembly ("memory-safe") { lp := shr(96, calldataload(hookData.offset)) }
         } else if (len >= 40) {
-            // 20 bytes LP + optional sqrtPriceX96 bytes
+            // abi.encodePacked: 20 bytes address at offset 0
             assembly ("memory-safe") { lp := shr(96, calldataload(hookData.offset)) }
         } else {
             lp = sender;
@@ -86,12 +89,13 @@ contract ILGuardHook is IHooks {
 
     function _extractSqrtPriceX96(bytes calldata hookData) internal pure returns (uint160 sqrtPriceX96) {
         uint256 len = hookData.length;
-        // 20 bytes LP + 32 bytes sqrtPriceX96 (abi.encode) = 52 bytes
-        // 20 bytes LP + 20 bytes sqrtPriceX96 (abi.encodePacked) = 40 bytes
-        if (len >= 52) {
-            assembly ("memory-safe") { sqrtPriceX96 := calldataload(add(hookData.offset, 20)) }
+        // abi.encode(address, uint160): 32 + 32 = 64 bytes. Value at bytes 32-63, left-padded.
+        // abi.encodePacked(address, uint160): 20 + 20 = 40 bytes. Value at bytes 20-39.
+        if (len >= 64) {
+            // abi.encode: uint160 is at bytes 32-63 (32 bytes, left-padded)
+            assembly ("memory-safe") { sqrtPriceX96 := shr(96, calldataload(add(hookData.offset, 32))) }
         } else if (len >= 40) {
-            // abi.encodePacked: read 20 bytes from offset 20, left-pad to uint160
+            // abi.encodePacked: uint160 is at bytes 20-39 (20 bytes)
             assembly ("memory-safe") { sqrtPriceX96 := shr(96, calldataload(add(hookData.offset, 20))) }
         }
     }
@@ -118,8 +122,10 @@ contract ILGuardHook is IHooks {
 
         PoolId poolId = key.toId();
         address lp = _resolveLp(sender, hookData);
-        uint256 amount0 = uint256(int256(delta.amount0()));
-        uint256 amount1 = uint256(int256(delta.amount1()));
+        int128 a0 = delta.amount0();
+        int128 a1 = delta.amount1();
+        uint256 amount0 = a0 < 0 ? uint256(int256(0) - int256(a0)) : uint256(int256(a0));
+        uint256 amount1 = a1 < 0 ? uint256(int256(0) - int256(a1)) : uint256(int256(a1));
         uint160 depositPrice = _extractSqrtPriceX96(hookData);
 
         positions[poolId][lp] = PositionSnapshot(amount0, amount1, depositPrice, true);
@@ -181,26 +187,26 @@ contract ILGuardHook is IHooks {
         PoolId poolId = key.toId();
         int128 amount0 = delta.amount0();
         int128 amount1 = delta.amount1();
-        uint256 outputAmount;
-        int128 hookDelta;
 
+        // Premium is based on the absolute output amount of the swap.
+        // V4 PoolManager may pass delta with varying sign conventions depending
+        // on the internal swap path, so we take abs() of both amounts.
+        // For zeroForOne: output is token1, for oneForZero: output is token0.
+        uint256 abs0;
+        uint256 abs1;
         unchecked {
-            if (params.zeroForOne) {
-                // User receives token1 (pool sends, so amount1 < 0)
-                if (amount1 < 0) {
-                    outputAmount = uint256(int256(-amount1));
-                    hookDelta = int128(int256((outputAmount * insuranceBps) / 10000));
-                }
-            } else {
-                // User receives token0 (pool sends, so amount0 < 0)
-                if (amount0 < 0) {
-                    outputAmount = uint256(int256(-amount0));
-                    hookDelta = int128(int256((outputAmount * insuranceBps) / 10000));
-                }
-            }
+            abs0 = amount0 < 0 ? uint256(int256(-amount0)) : uint256(int256(amount0));
+            abs1 = amount1 < 0 ? uint256(int256(-amount1)) : uint256(int256(amount1));
         }
 
-        if (outputAmount > 0 && hookDelta > 0) {
+        // Premium is charged on the output side
+        uint256 outputAmount = params.zeroForOne ? abs1 : abs0;
+        int128 hookDelta;
+        unchecked {
+            hookDelta = int128(int256((outputAmount * insuranceBps) / 10000));
+        }
+
+        if (hookDelta > 0) {
             reserves[poolId].totalPremiumsAccrued += uint256(int256(hookDelta));
             emit InsurancePremiumAccrued(poolId, uint256(int256(hookDelta)));
         }

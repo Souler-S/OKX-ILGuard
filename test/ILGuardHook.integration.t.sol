@@ -30,8 +30,8 @@ contract ILGuardHookIntegrationTest is Test {
 
     // Hook permission bits for ILGuardHook:
     // afterAddLiquidity (1<<10) | beforeRemoveLiquidity (1<<9) | afterRemoveLiquidity (1<<8)
-    // | afterSwap (1<<6) | afterSwapReturnDelta (1<<2)
-    uint160 constant HOOK_PERMISSIONS = 0x0744;
+    // | afterSwap (1<<6)
+    uint160 constant HOOK_PERMISSIONS = 0x0740;
 
     uint16 constant INSURANCE_BPS = 15;
     uint16 constant COMPENSATION_THRESHOLD_BPS = 500;
@@ -340,7 +340,7 @@ contract ILGuardHookIntegrationTest is Test {
     // price-weighted impermanent loss after swaps. IL compensation is separately verified
     // via test_integration_directRemove_WithHookData_CompensatesRealLp using synthetic delta.
 
-    function test_integration_fullCloseLoop_AddSwapRemove_NoCompensationDueToMvpFormula() public {
+    function test_integration_fullCloseLoop_AddSwapRemove_VerifiesLifecycle() public {
         // 1. Add full-range liquidity
         ModifyLiquidityParams memory addParams = ModifyLiquidityParams({
             tickLower: TickMath.minUsableTick(TICK_SPACING),
@@ -351,7 +351,7 @@ contract ILGuardHookIntegrationTest is Test {
         modifyLiquidityRouter.modifyLiquidity(key, addParams, ZERO_BYTES);
 
         // 2. Read deposit snapshot
-        (uint256 snap0, uint256 snap1, uint160 snapPrice, bool snapExists) = hook.positions(poolId, address(modifyLiquidityRouter));
+        (uint256 snap0, uint256 snap1, uint160 _sp, bool snapExists) = hook.positions(poolId, address(modifyLiquidityRouter));
         uint256 depositValue = snap0 + snap1;
 
         // 3. Fund insurance reserve
@@ -404,7 +404,6 @@ contract ILGuardHookIntegrationTest is Test {
         assertTrue(uint160(address(hook)) & (1 << 9) != 0, "beforeRemoveLiquidity bit missing");
         assertTrue(uint160(address(hook)) & (1 << 8) != 0, "afterRemoveLiquidity bit missing");
         assertTrue(uint160(address(hook)) & (1 << 6) != 0, "afterSwap bit missing");
-        assertTrue(uint160(address(hook)) & (1 << 2) != 0, "afterSwapReturnDelta bit missing");
 
         // Verify that PoolManager's validation passes (isValidHookAddress)
         assertTrue(

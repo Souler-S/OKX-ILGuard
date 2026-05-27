@@ -1,7 +1,7 @@
 # OKX-ILGuard — Tweet Drafts
 
 **IMPORTANT: Do NOT post these until CEO approves final GitHub repo and demo video links.**
-**GitHub link is filled. Replace `[Demo video link]` before posting. Do not post until the video link is live.**
+**Tweet 1 has been posted with the demo video attached.**
 
 ---
 
@@ -25,7 +25,7 @@ Tests: IL detection + compensation branch.
 @Uniswap @flapdotsh
 
 https://github.com/Souler-S/OKX-ILGuard
-[Demo video link]
+https://x.com/ThreeOclock_CN/status/2059224654519091393?s=20
 ```
 
 ---
@@ -77,7 +77,7 @@ The MVP is deployed and testable. The roadmap is clear.
 ## Posting Notes
 
 - All three tweets must tag `@XLayerOfficial @Uniswap @flapdotsh`
-- Wait for CEO to fill in GitHub repo URL and demo video URL before posting Tweet 1
+- Tweet 1 posted: https://x.com/ThreeOclock_CN/status/2059224654519091393?s=20
 - Tweet 2 can be a thread of 3-4 tweets if desired
 - Tweet 3 should go after the submission deadline, showing continued engagement
 - Do not claim real compensation has occurred on mainnet — be honest about MVP limitations

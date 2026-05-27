@@ -109,7 +109,7 @@ forge test --match-test test_integration_directRemove_WithHookData_CompensatesRe
 
 See `DEMO_SCRIPT.md` for the 2-minute video script.
 
-Demo video: `VIDEO_URL_TO_BE_ADDED`
+Demo video / submission tweet: https://x.com/ThreeOclock_CN/status/2059224654519091393?s=20
 
 ## Future Upgrade Path
 
