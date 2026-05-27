@@ -13,7 +13,10 @@ import {Currency} from "v4-core/types/Currency.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {TestERC20} from "v4-core/test/TestERC20.sol";
 
-contract MockPoolManager {}
+contract MockPoolManager {
+    // Minimal mock to accept poolManager.take() and settle() calls from the hook
+    fallback() external payable {}
+}
 
 contract ILGuardHookTest is Test {
     using PoolIdLibrary for PoolKey;

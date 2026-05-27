@@ -62,7 +62,7 @@ contract ILGuardHook is IHooks {
 
     uint16 public immutable insuranceBps;
     uint16 public immutable compensationThresholdBps;
-    uint160 public constant HOOK_PERMISSIONS = 0x0740;
+    uint160 public constant HOOK_PERMISSIONS = 0x0744;
 
     constructor(IPoolManager _poolManager, uint16 _insuranceBps, uint16 _compensationThresholdBps) {
         poolManager = _poolManager;
@@ -217,8 +217,6 @@ contract ILGuardHook is IHooks {
         int128 amount1 = delta.amount1();
 
         // Premium is based on the absolute output amount of the swap.
-        // V4 PoolManager may pass delta with varying sign conventions depending
-        // on the internal swap path, so we take abs() of both amounts.
         // For zeroForOne: output is token1, for oneForZero: output is token0.
         uint256 abs0;
         uint256 abs1;
@@ -228,13 +226,21 @@ contract ILGuardHook is IHooks {
         }
 
         // Premium is charged on the output side
-        uint256 outputAmount = params.zeroForOne ? abs1 : abs0;
+        bool zeroForOne = params.zeroForOne;
+        uint256 outputAmount = zeroForOne ? abs1 : abs0;
+        Currency outputCurrency = zeroForOne ? key.currency1 : key.currency0;
         int128 hookDelta;
         unchecked {
             hookDelta = int128(int256((outputAmount * insuranceBps) / 10000));
         }
 
         if (hookDelta > 0) {
+            // Take premium tokens from PoolManager into this hook contract.
+            // This creates a negative delta (-hookDelta) that cancels with the
+            // positive hookDelta returned below → no CurrencyNotSettled.
+            poolManager.take(outputCurrency, address(this), uint256(int256(hookDelta)));
+
+            reserves[poolId].balance += uint256(int256(hookDelta));
             reserves[poolId].totalPremiumsAccrued += uint256(int256(hookDelta));
             emit InsurancePremiumAccrued(poolId, uint256(int256(hookDelta)));
         }

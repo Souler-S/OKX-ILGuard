@@ -31,7 +31,7 @@ contract ILGuardHookIntegrationTest is Test {
     // Hook permission bits for ILGuardHook:
     // afterAddLiquidity (1<<10) | beforeRemoveLiquidity (1<<9) | afterRemoveLiquidity (1<<8)
     // | afterSwap (1<<6)
-    uint160 constant HOOK_PERMISSIONS = 0x0740;
+    uint160 constant HOOK_PERMISSIONS = 0x0744;
 
     uint16 constant INSURANCE_BPS = 15;
     uint16 constant COMPENSATION_THRESHOLD_BPS = 500;
@@ -394,10 +394,10 @@ contract ILGuardHookIntegrationTest is Test {
 
         // 8. Reserve unchanged — proves no compensation occurred (MVP formula limitation)
         (uint256 reserveAfter,) = hook.reserves(poolId);
-        assertEq(reserveAfter, reserveBefore, "reserve should NOT change (no IL detected by MVP formula)");
+        assertGt(reserveAfter, reserveBefore, "reserve should INCREASE with premium collected");
 
         console.log("Deposit value (snap0+snap1):", depositValue);
-        console.log("Reserve unchanged:", reserveBefore, "->", reserveAfter);
+        console.log("Reserve with premium:", reserveBefore, "->", reserveAfter);
         console.log("Premiums accrued:", premiumsAfterSwap);
     }
 
@@ -409,6 +409,7 @@ contract ILGuardHookIntegrationTest is Test {
         assertTrue(uint160(address(hook)) & (1 << 9) != 0, "beforeRemoveLiquidity bit missing");
         assertTrue(uint160(address(hook)) & (1 << 8) != 0, "afterRemoveLiquidity bit missing");
         assertTrue(uint160(address(hook)) & (1 << 6) != 0, "afterSwap bit missing");
+        assertTrue(uint160(address(hook)) & (1 << 2) != 0, "afterSwapReturnDelta bit missing");
 
         // Verify that PoolManager's validation passes (isValidHookAddress)
         assertTrue(
